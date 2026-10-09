@@ -1,72 +1,113 @@
-# light-sdk
-or: a tool for building Tools
+# BrightRecorderLite
 
-## tl;dr
-This repository contains the scaffolding for building simple tools for the Light Phone III. Included are a library ([:sdk:client](./sdk/client)) and placeholder application ([:tool](./tool)) that depends on it. To create a tool that is fully compatible with LightOS, you must write your application code within the `tool` module, using the primitives provided by the sdk client library.
+**Recorder Lite** is a tape recorder for moments, built as an official Light SDK tool for the
+Light Phone III. It is the Tool Library version of
+[BrightRecorder](https://github.com/gi-os/BrightRecorder), cut down to what a Light SDK tool is
+allowed to do.
 
-You can and should use current Android best practices: Kotlin for all source code, Compose for UI, Coroutines for async programming, and MVVM architecture. **Although this is appears to be a fairly standard Android dev environment, you will quickly find out that we are (gently but broadly) restricting which Android APIs and third-party libraries can be used. This is in an effort to provide a secure and distinctly _light_ experience for our users. These restrictions are _not_ set in stone and should ease up over time. If there is a stable, open-source library that you'd like us to allow, please let us know! More on this later.**
+Record a moment and it is filed by when and where it happened. Keep several tapes, one for a trip,
+one for the flat, one for the year. Play a tape back as one continuous length of tape, and wind
+through it with the scroll wheel.
 
-## IMPORTANT!! July 1, 2026 Update
-If you're reading this, welcome! You're early! (in a cool way)
-This repo is a work-in-progress and will remain so for a while. Things are going to change _fast_ in the coming weeks. If you're going to start building right away, be sure to `git pull` frequently.
-Before you do, though, please be aware that **while we feel good about letting everybody start to explore and build, we are still working on the infrastructure to properly deploy your new tools.**
-The currently builds of LightOS in the wild are not yet ready to "play nice" with the tools built here. If you're someone who's already comfortable working with ADB to sideload APKs on your
-Light Phone III, you can totally do that with whatever you do here! But we're shooting to make these tools feel as seamless as the ones already available in LightOS, and that's going to take a bit more work. 
-We're hoping to have an update on that front later this month. In the meantime, the best way to start working is to use an Android emulator running our new [LightOS Emulator](sdk/emulator). The instructions for getting that up and running
-are [right here](docs/system_app).
+Tool id `com.gios.brightrecorderlite`, label "Recorder Lite".
 
-## Quickstart
+## Using it
 
-### Running your Tool
-**You can test your tool on any Android device or emulator**, but certain functionality (receiving push notifications, requesting special permissions) can only be tested with:
-A) Real Light Phone hardware running LightOS
-B) An Android emulator (on your computer) set up to run our LightOS emulator app as a _system app_ ([see advanced instructions](docs/system_app))
+- **Shelf.** The first screen lists your tapes, oldest first. `+` starts a new one. Tap a tape to
+  put it on the machine.
+- **The machine.** One tape at a time.
+  - Turn the wheel to wind forwards or backwards. Each notch is 0.3 seconds of tape, so turning
+    faster covers more ground. Winding crosses from one moment into the next with no gap. If the
+    tape was stopped it plays while the wheel turns, so you hear where you are, and stops again
+    when you let go. If it was playing it keeps playing from where you land.
+  - Tap the wheel to play or stop. Hold it (0.4 s) to record. Press it again to stop recording.
+  - The bottom bar does the same by touch: previous moment, play/pause, record, next moment, and
+    the list of moments. Tap the tape bar to jump to that point on the tape.
+- **Moments.** The list shows every clip in tape order. Tap one to play from it. The pencil opens
+  it: rename it (each word gets a capital, the rest stays as typed) or delete it after a
+  confirmation.
+- **Tape options** (the `...` button): rename the tape, or delete it once it is empty. A tape with
+  moments on it cannot be deleted in one step; delete the moments first. A recursive delete of
+  recordings that cannot be made again is the one mistake this tool refuses to make easy.
+- **Leaving the screen.** Playback is detached (`detached-audio`), so the tape keeps playing after
+  you go back to the shelf or leave the tool. Opening the same tape again reattaches to it.
+  Recording stops and is filed when you leave the screen.
 
-You can quickly [create an emulator](https://developer.android.com/studio/run/managing-avds) that generally feels like an LPIII by using the following settings:
-* 1080 X 1240, 3.92" display
-* Android API 34
-* NO Google Play Services installed
+## What it keeps from BrightRecorder
 
-### Start Building
-1. Fork and/or clone this repository into your local dev environment.
-2. Install Android Studio and open this project within it. (IntelliJ IDEA should also work)
+| Feature | Notes |
+|---|---|
+| Tapes as folders, clips as files named by time and place | `tapes/2026-08-17 143205 Trip/2026-08-17 143912 48.86 N, 2.37 E.m4a`. Ported `Naming` and `Tapes`. |
+| One continuous tape | Ported `Timeline`, in milliseconds instead of samples. Every clip is queued in recording order on one `LightAudioPlayer`. |
+| Wheel winding, audible | Rebuilt as short seeks while playing (`Wind`), see below. |
+| Tap the wheel to play/stop, hold to record | Ported `Press` and the `LightKeys` keycode/scancode mapping (`WHEEL_CCW`, `WHEEL_CW`, `WHEEL_CLICK`; scancodes 19, 20, 66). |
+| Where and when | Location from `GetCurrentLocation`, with a `RequestLocationUpdates` lease held while recording and `GetDefaultLocation` as the fallback. Latitude and longitude are stored with every clip. |
+| Rename and delete moments, rename and delete empty tapes | Same rules as the original. |
+| Raw microphone input | `MicSource.Unprocessed` first, falling back to the processed mic where the device does not offer it. |
 
-3. Edit the code in `HomeScreen` and `HomeScreenViewModel` to get started. `Homescreen` surfaces a `@Composable` method named `Content`. This is the UI that is shown when the tool first boots. You'll notice this UI sources data from it's `viewModel` field, which is an instance of `HomeScreenViewModel`. Edit that class with your screen's logic and expose the data to the UI using either Compose `State` or Coroutine `Flow`s. If you want to create a new screen, create a new Screen/ViewModel pair: your screen should extend from `LightScreen` and your VM from `LightScreenViewModel`. Your screen implementation will need:
-   1. A direct reference to your ViewModel's class type
-   2. A factory method for creating a new instance of your ViewModel.
+## What it drops, and why
 
-Look at `HomeScreen` as an example for how this is done. To navigate to your new screen, use the `navigateTo` function built into `LightScreen` - just pass it a lambda to create an instance of your new screen. Note that the `LightScreen` constructor takes in a `SealedLightActivity`. The lambda is provided an instance of this as a default parameter.
+| Dropped | Why |
+|---|---|
+| Place names ("Trastevere, Rome") | The original used Android's `Geocoder` (needs an Android `Context`, which tools cannot get) or OpenStreetMap's Nominatim (needs `INTERNET`, which this tool does not request; it asks for the microphone and location only). There is no offline gazetteer. A clip is labeled with its coordinates rounded to two decimals, about a kilometer, or "Somewhere" with no fix. Rename it to give it a real name. |
+| Hearing the tape played backwards, pitch-shifted winding at 8x, anti-aliased resampling | The original ran its own PCM audio loop over uncompressed WAV. A tool records through `LightAudioRecorder`, which writes AAC in MPEG-4, and plays through `LightAudioPlayer`, which seeks but cannot play in reverse. Winding is therefore a run of short seeks with a fragment of real audio between them. |
+| Uncompressed 22.05 kHz WAV, makeup gain and limiter on the record path | `LightAudioRecorder` only writes AAC/M4A and exposes no gain stage. |
+| Loudness normalization (BS.1770) on playback | Needs per-sample access on the playback path; `LightAudioPlayer` has none. |
+| Crash-safe recording (rebuilding a WAV header after the process dies) | An MPEG-4 file is only playable once the recorder writes its index on stop. A recording interrupted by the process dying cannot be recovered, and the tool cleans up the partial file on the next open. Leaving the screen or the tool stops and files the recording normally. |
+| Renaming a clip later when a better place name arrives, the offline rename queue | No reverse geocoding (see above). |
+| Hand-drawn cassette labels, photos on labels, label patterns, "starred" photos from Roll | Read DCIM/Pictures and another app's content provider; tools have no storage or provider access. |
+| Sending a moment to BrightChat | `FileProvider` URIs and `Intent`s with read grants; tools cannot start other apps. |
+| Shake to report | Needs the accelerometer (`SensorManager` via `getSystemService`) and network access. |
+| Foreground recording service, recording notification, keeping the screen on | Tools cannot run Android services or post notifications. Detached playback is the SDK's sanctioned way to keep audio going. |
+| Momentary rewind and fast-forward keys that latch and resume | Rebuilt as "previous moment" and "next moment", because `LightBarButton` only reports taps, not press and release. The wheel covers winding. |
+| Arbitration with LightControl | A sideload-only concern. Under LightOS the wheel keys reach the focused tool directly. |
 
-Since LightOS does not use Android system navigation, we provide a back button for you. As long as you use `navigateTo` to move between screens, our back button should work great. If need be, you can override the `onBackPressed` method in your `LightViewModel`.
+## Permissions
 
-### Submitting Your Tool
-Given our relatively limited resources and desire to keep our users safe, we're requiring that all community tools be open source (including our own!). 
-Tools are built and signed directly from a publicly available git commit, and we'll be archiving the source at build time.
-You're free to build and share privately, but LightOS won't let you install tools that are not signed by us without acknowledging privacy and performance risks.
-We won't block users from performing these "dangerous" sideloads, but we're not going to encourage it either. 
-Using the Dashboard, developers are able to queue up a build of your tool on our servers, and if it follows our guidelines and compiles cleanly, we will hand you back a signed, shareable APK.
+- `android.permission.RECORD_AUDIO`, asked the first time you record.
+- `android.permission.ACCESS_FINE_LOCATION`, asked once when a tape is first opened. Optional:
+  without it, moments are filed under "Somewhere".
 
-1. Review the [Tool Guidelines](TOOL_GUIDELINES.md) to get a sense of the kind of tools we're hoping to showcase.
-2. Ensure your tool is built with the latest Light SDK version and is accessible via a public Github repo.
-3. Enable developer mode on the [dashboard](https://dashboard.thelightphone.com/): Settings -> Account -> Developer Account.
-4. From there, you can create your tool: Settings -> Account -> Developer Account -> Manage Custom Tools -> Submit New Tool:
-  - The package name is unique for all tools and can't be changed later. It is pulled from the default branch of the Github repo submitted upon registering the tool.
-  - You'll then have the opportunity to add images. You can add them later on as well, but we'll require at least one for a tool to be approved.
-5. Now go in the tool detail page and press "submit build":
-  - Enter the git ref of the version of the tool to be built and a small description of the changelog.
-  - If your tool already has an active build, you won't be able to submit another.
-  - The `versionCode` of the submitted build should be higher than the one of the last version listed in the Tool page.
-6. Wait for the build to finish:
-  - In case of an error, use the "view details" button on the "Builds" section of the Tool page to check the error message. The "retry build" can be used to re-attempt building from the same git ref if necessary.
-  - If you believe the build error is due to an issue on our end (e.g. with light-sdk or our infrastructure), please feel free to open an Issue on this repo!
-  - In case of success, the "download apk" button should appear. A new "Version" entry will be created with "pending approval" status.
-7. Our team will review the builds and reach out to you via e-mail if we have any feedback regarding the approval process.
-8. If you have any questions, please e-mail us at tools@thelightphone.com
+Capability: `detached-audio`.
 
-### Sharing Your Tool
-Once we release a version of LightOS that supports community tools, users will have an option to choose what kind of tools they want to be able to run on their device:
-- **Light-approved tools**: These include tools that are either built internally by the Light team, or built by the community and officially tested/signed-off by the Light team. We don't know _exactly_ what that sign-off process is going to look like, but as a heads-up: we're going to be looking pretty hard at whether a submitted tool matches the Light ethos both functionally and aesthetically. We've included a UX/UI library to make this as easy as possible! From a technical standpoint, these approved tools are both signed by us _and_ added to an "allow-list" within LightOS. Phones with this option selected will only install and display tools that meet both criteria.
-- **SDK-built tools**: This is a slightly more permissive choice. Phones with this option selected will install and launch any tool that was built and signed by Light. These don't require any manual approval by us (although we can block them in extreme cases). If a user wants to be able to install a tool that was shared locally or somewhere outside of Light's dashboard, but they still want to be confident that it will run well and integrate nicely with LightOS, they might choose this option.
-- **Any tools**: A user will have the option to make any APK launchable from LightOS, but they will own the responsibility of getting them installed/uninstalled. When a user selects this option, we will warn them that they are potentially opening their device up to security risks, and that doing so will limit our ability to support them if something goes wrong.
+## Storage
 
-## [Complete Documentation](./docs)
+Everything lives in the tool's private `filesDir`:
+
+```
+tapes/<yyyy-MM-dd HHmmss> <tape name>/
+    <yyyy-MM-dd HHmmss> <place or name>.m4a
+    .clips          one line per clip: file name, length in ms, latitude, longitude
+```
+
+`.clips` is a cache. A clip without a row still plays; its length is read from the file and
+written back.
+
+## Build
+
+Needs JDK 17 and the Android SDK (platform 36).
+
+```bash
+./gradlew -DlightSdk.toolOnly=true :tool:assembleDebug
+./gradlew -DlightSdk.toolOnly=true :tool:testDebugUnitTest :tool:lintDebug
+```
+
+CI (`.github/workflows/build-tool.yml`) runs tests, lint and assemble on every push.
+
+Unit tests cover the Android-free parts: `Naming`, `Place`, `Timeline`, `Wind`, `Press`,
+`Library` and `Tapes`.
+
+## Tool Library submission notes
+
+- All tool code is in `tool/`. The SDK modules (`sdk/`, `plugin/`, `lint-rules/`) are untouched
+  upstream code, so the repo can be rebased on `lightphone/light-sdk`.
+- No hand-written manifest, no Java sources, no dependencies beyond `:sdk:client`.
+- Permissions are limited to the microphone and location. No network access.
+- Things to check on a device before submitting: the wheel keycodes under the shipping LightOS
+  build, detached playback continuing after the tool closes, and the location lease being released
+  after recording.
+
+## Credit
+
+Built on [lightphone/light-sdk](https://github.com/lightphone/light-sdk) (MIT). See
+[LICENSE](LICENSE).
