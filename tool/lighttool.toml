@@ -1,6 +1,6 @@
 [tool]
 id = "com.gios.brightrecorderlite"
-label = "Recorder Lite"
+label = "BrightRecorder Lite"
 versionCode = 1
 versionName = "0.1.0"
 permissions = ["android.permission.RECORD_AUDIO", "android.permission.ACCESS_FINE_LOCATION"]
