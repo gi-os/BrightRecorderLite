@@ -1,8 +1,8 @@
 [tool]
 id = "com.gios.brightrecorderlite"
-label = "BrightRecorder Lite"
-versionCode = 1
-versionName = "0.1.0"
+label = "Recorder"
+versionCode = 2
+versionName = "0.1.1"
 permissions = ["android.permission.RECORD_AUDIO", "android.permission.ACCESS_FINE_LOCATION"]
 capabilities = ["detached-audio"]
 orientation = "portrait"
