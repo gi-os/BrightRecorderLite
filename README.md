@@ -1,5 +1,7 @@
 # BrightRecorderLite
 
+> **This is the Lite version.** BrightRecorder Lite is built only with Light's official SDK, so it can go in the Light Tool Library. It does less than the full app. For the full app, get [BrightRecorder](https://github.com/gi-os/BrightRecorder) ([on BrightMarket](https://brightmarket.gzl.dev/app/com.gios.brightrecorder/)).
+
 **Recorder Lite** is a tape recorder for moments, built as an official Light SDK tool for the
 Light Phone III. It is the Tool Library version of
 [BrightRecorder](https://github.com/gi-os/BrightRecorder), cut down to what a Light SDK tool is
