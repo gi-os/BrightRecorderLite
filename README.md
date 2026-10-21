@@ -1,3 +1,5 @@
+<a href="https://github.com/sponsors/gi-os"><img src="https://raw.githubusercontent.com/gi-os/gi-os/main/images/bright-sponsors.svg" width="100%" alt="Thank you to my sponsors"></a>
+
 # BrightRecorderLite
 
 > **This is the Lite version.** BrightRecorder Lite is built only with Light's official SDK, so it can go in the Light Tool Library. It does less than the full app. For the full app, get [BrightRecorder](https://github.com/gi-os/BrightRecorder) ([on BrightMarket](https://brightmarket.gzl.dev/app/com.gios.brightrecorder/)).
