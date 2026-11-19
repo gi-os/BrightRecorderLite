@@ -125,6 +125,15 @@ class DeckViewModel(
     private var defaultFix: Fix? = null
     private var message: String? = null
 
+    /** The player error already shown and dismissed by a press; the player cannot clear its own. */
+    private var dismissedError: Any? = null
+
+    /** The mic permission was asked for from a press, so a grant should start the recording. */
+    private var awaitingMic = false
+
+    /** When that ask went out. Only a return soon after it counts as its answer. */
+    private var askedMicAt = 0L
+
     init {
         viewModelScope.launch {
             player.awaitReady()
@@ -151,6 +160,18 @@ class DeckViewModel(
         viewModelScope.launch {
             micGranted = granted(Manifest.permission.RECORD_AUDIO)
             locationGranted = granted(Manifest.permission.ACCESS_FINE_LOCATION)
+            // A stale ask (the prompt never showed, or the user came back much later) must not
+            // start a recording on its own.
+            if (awaitingMic && SystemClock.elapsedRealtime() - askedMicAt > 60_000L) awaitingMic = false
+            if (awaitingMic) {
+                awaitingMic = false
+                if (micGranted) {
+                    startRecording()
+                } else {
+                    message = "Microphone is off. Allow it in Settings to record."
+                    publish()
+                }
+            }
             if (!locationGranted && !askedLocation) {
                 askedLocation = true
                 ask.value = Manifest.permission.ACCESS_FINE_LOCATION
@@ -181,6 +202,12 @@ class DeckViewModel(
 
     fun permissionAsked() {
         ask.value = null
+    }
+
+    /** A press clears whatever the last one reported. */
+    private fun clearMessage() {
+        message = null
+        dismissedError = player.error.value
     }
 
     /** The tape was renamed under us. */
@@ -314,6 +341,7 @@ class DeckViewModel(
     // ---- transport -------------------------------------------------------------------------
 
     fun togglePlay() {
+        clearMessage()
         if (recordingFile != null) {
             stopRecording()
             return
@@ -332,6 +360,7 @@ class DeckViewModel(
 
     /** Skip a whole moment, forwards or back. */
     fun skip(count: Int) {
+        clearMessage()
         if (recordingFile != null || timeline.isEmpty) return
         val target = timeline.seekByClip(currentGlobal(), count)
         if (target >= timeline.durationMs) return
@@ -340,11 +369,13 @@ class DeckViewModel(
 
     /** Jump to a fraction of the whole tape, from a tap on the tape bar. */
     fun seekFraction(fraction: Float) {
+        clearMessage()
         if (recordingFile != null || timeline.isEmpty) return
         seekGlobal((timeline.durationMs * fraction.coerceIn(0f, 1f)).toLong())
     }
 
     fun playClip(index: Int) {
+        clearMessage()
         if (recordingFile != null || index !in timeline.clips.indices) return
         seekGlobal(timeline.startOf(index))
         player.play()
@@ -384,6 +415,7 @@ class DeckViewModel(
     // ---- recording -------------------------------------------------------------------------
 
     fun record() {
+        clearMessage()
         if (recordingFile != null) {
             stopRecording()
             return
@@ -391,7 +423,13 @@ class DeckViewModel(
         if (!micGranted) {
             viewModelScope.launch {
                 micGranted = granted(Manifest.permission.RECORD_AUDIO)
-                if (micGranted) startRecording() else ask.value = Manifest.permission.RECORD_AUDIO
+                if (micGranted) {
+                    startRecording()
+                } else {
+                    awaitingMic = true
+                    askedMicAt = SystemClock.elapsedRealtime()
+                    ask.value = Manifest.permission.RECORD_AUDIO
+                }
             }
             return
         }
@@ -408,7 +446,7 @@ class DeckViewModel(
         val file = Library.recordingFile(dir, startedAt)
         val started = tryStart(file, MicSource.Unprocessed) || tryStart(file, MicSource.Mic)
         if (!started) {
-            message = "The microphone could not be opened"
+            message = "Could not open the microphone. Try again."
             publish()
             return
         }
@@ -455,7 +493,7 @@ class DeckViewModel(
         locationJob = null
         if (durationMs <= 0L || !file.exists()) {
             file.delete()
-            message = "Nothing was recorded"
+            message = "Nothing was recorded. Try again."
             publish()
             return
         }
@@ -468,7 +506,7 @@ class DeckViewModel(
             meta = Library.Meta(durationMs, fix?.latitude, fix?.longitude),
         )
         if (clip == null) {
-            message = "The recording could not be filed"
+            message = "Could not save the recording. Try again."
             publish()
             return
         }
@@ -596,7 +634,7 @@ class DeckViewModel(
             durationMs = timeline.durationMs,
             clipIndex = spot?.index ?: -1,
             clipTitle = clip?.title,
-            message = message ?: player.error.value?.let { "This moment could not be played" },
+            message = message ?: player.error.value?.takeIf { it !== dismissedError }?.let { "Could not play this moment" },
         )
     }
 

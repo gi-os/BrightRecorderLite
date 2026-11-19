@@ -62,7 +62,11 @@ class TapeOptionsScreen(
                         Spacer(Modifier.height(1f.gridUnitsAsDp()))
                         LightText("ON IT", LightTextVariant.Superfine, lighten = true)
                         LightText(
-                            "${t.clips} moments, ${Naming.duration(t.durationMs)}",
+                            if (t.clips == 1) {
+                                "1 moment, ${Naming.duration(t.durationMs)}"
+                            } else {
+                                "${t.clips} moments, ${Naming.duration(t.durationMs)}"
+                            },
                             LightTextVariant.Copy,
                         )
                         if (!t.isEmpty) {

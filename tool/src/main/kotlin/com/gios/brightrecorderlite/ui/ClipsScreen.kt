@@ -19,7 +19,6 @@ import com.gios.brightrecorderlite.tape.Tapes
 import com.thelightphone.sdk.SealedLightActivity
 import com.thelightphone.sdk.SimpleLightScreen
 import com.thelightphone.sdk.ui.LightBarButton
-import com.thelightphone.sdk.ui.LightIcon
 import com.thelightphone.sdk.ui.LightIcons
 import com.thelightphone.sdk.ui.LightScrollView
 import com.thelightphone.sdk.ui.LightText
@@ -33,7 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Every moment on the tape, in the order the tape plays them. Tap one to play from it; the pencil
+ * Every moment on the tape, in the order the tape plays them. Tap one to play from it; Edit
  * opens it to rename or delete. Returns the index to play.
  */
 class ClipsScreen(
@@ -75,14 +74,15 @@ class ClipsScreen(
                                 detail = "${Naming.whenOnly(clip.startedAt)}  ${Naming.duration(clip.durationMs)}",
                                 onClick = { goBack(index) },
                                 trailing = {
-                                    LightIcon(
-                                        LightIcons.PENCIL,
+                                    LightText(
+                                        "Edit",
+                                        LightTextVariant.Copy,
+                                        underline = true,
                                         modifier = Modifier
                                             .padding(start = 1f.gridUnitsAsDp())
                                             .lightClickable {
                                                 navigateTo({ ClipScreen(it, tapeDirName, clip.fileName) })
                                             },
-                                        size = 2f,
                                     )
                                 },
                             )

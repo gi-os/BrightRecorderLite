@@ -25,6 +25,7 @@ import com.thelightphone.sdk.ui.LightTextVariant
 import com.thelightphone.sdk.ui.LightTopBar
 import com.thelightphone.sdk.ui.LightTopBarCenter
 import com.thelightphone.sdk.ui.gridUnitsAsDp
+import com.thelightphone.sdk.ui.lightClickable
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +36,9 @@ class ShelfViewModel(private val root: File) : LightViewModel<Unit>() {
 
     val tapes = MutableStateFlow<List<Tape>>(emptyList())
 
+    /** False until the first read of the shelf has finished. */
+    val loaded = MutableStateFlow(false)
+
     override fun onScreenShow(screen: SimpleLightScreen<Unit>) {
         refresh()
     }
@@ -42,6 +46,7 @@ class ShelfViewModel(private val root: File) : LightViewModel<Unit>() {
     fun refresh() {
         viewModelScope.launch {
             tapes.value = withContext(Dispatchers.IO) { Tapes.ensureOne(root, System.currentTimeMillis()) }
+            loaded.value = true
         }
     }
 
@@ -68,18 +73,21 @@ class ShelfScreen(sealedActivity: SealedLightActivity) :
         navigateTo({ TapeScreen(it, tape.dirName) })
     }
 
+    private fun newTape() {
+        navigateTo({ TextEditScreen(it, "New tape", "", "CREATE") }) { name ->
+            if (name.isNotBlank()) viewModel.create(name) { open(it) }
+        }
+    }
+
     @Composable
     override fun Content() {
         val tapes by viewModel.tapes.collectAsState()
+        val loaded by viewModel.loaded.collectAsState()
         Themed {
             Column(Modifier.fillMaxSize()) {
                 LightTopBar(
                     center = LightTopBarCenter.Text("Tapes"),
-                    rightButton = LightBarButton.LightIcon(LightIcons.ADD, onClick = {
-                        navigateTo({ TextEditScreen(it, "New tape", "", "CREATE") }) { name ->
-                            if (name.isNotBlank()) viewModel.create(name) { open(it) }
-                        }
-                    }),
+                    rightButton = LightBarButton.LightIcon(LightIcons.ADD, onClick = { newTape() }),
                 )
                 LightScrollView(Modifier.fillMaxWidth().weight(1f)) {
                     for (tape in tapes) {
@@ -90,11 +98,27 @@ class ShelfScreen(sealedActivity: SealedLightActivity) :
                         )
                     }
                     if (tapes.isEmpty()) {
-                        LightText(
-                            "Loading",
-                            LightTextVariant.Copy,
-                            modifier = Modifier.padding(1f.gridUnitsAsDp()),
-                        )
+                        if (!loaded) {
+                            LightText(
+                                "Loading",
+                                LightTextVariant.Copy,
+                                modifier = Modifier.padding(1f.gridUnitsAsDp()),
+                            )
+                        } else {
+                            LightText(
+                                "No tapes yet",
+                                LightTextVariant.Copy,
+                                modifier = Modifier.padding(1f.gridUnitsAsDp()),
+                            )
+                            LightText(
+                                "New tape",
+                                LightTextVariant.Copy,
+                                underline = true,
+                                modifier = Modifier
+                                    .padding(horizontal = 1f.gridUnitsAsDp())
+                                    .lightClickable { newTape() },
+                            )
+                        }
                     }
                 }
             }
